@@ -1,0 +1,208 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String             @id @default(uuid())
+  name         String
+  email        String             @unique
+  phone        String?
+  collegeId    String?
+  branch       String?
+  section      String?
+  rollNumber   String?
+  role         String             @default("STUDENT") // STUDENT, CREATOR, ADMIN
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @default(now()) @updatedAt
+
+  orders       Order[]            @relation("StudentOrders")
+  creator      CreatorProfile?
+  notifications Notification[]
+  reviews      Review[]
+}
+
+model College {
+  id           String             @id @default(uuid())
+  name         String
+  code         String             @unique
+  active       Boolean            @default(true)
+  locations    CampusLocation[]
+  pricingRules PricingRule[]
+}
+
+model CampusLocation {
+  id           String   @id @default(uuid())
+  collegeId    String?
+  name         String
+  description  String?
+  hours        String?
+  active       Boolean  @default(true)
+  orders       Order[]
+  college      College? @relation(fields: [collegeId], references: [id])
+}
+
+model PricingRule {
+  id            String   @id @default(uuid())
+  collegeId     String?
+  serviceType   String   // ASSIGNMENT, CAD
+  price         Float    // e.g. 25 for assignment per page
+  rushFee       Float    @default(0)
+  effectiveFrom DateTime @default(now())
+  active        Boolean  @default(true)
+  college       College? @relation(fields: [collegeId], references: [id])
+}
+
+model CadProduct {
+  id                String           @id @default(uuid())
+  title             String
+  description       String
+  category          String           // Orthographic, Isometric, Sectional, Development, Lines, Planes, AutoCAD, Other
+  price             Float            // e.g. 149
+  turnaroundHours   Int              @default(24)
+  difficulty        String           @default("Medium") // Basic, Intermediate, Advanced
+  availability      String           @default("Available") // Available, High Demand, Limited
+  sampleImages      String           // JSON string array of URLs
+  preparedSampleUrl String?          // Sample image of the final prepared physical sheet uploaded by admin
+  active            Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @default(now()) @updatedAt
+
+  cadOrderDetails CadOrderDetails[]
+}
+
+model Order {
+  id                String                   @id @default(uuid())
+  orderNumber       String                   @unique // e.g. ASG1024, CAD1025
+  userId            String
+  serviceType       String                   // ASSIGNMENT, CAD
+  status            String                   // UPLOADED, PAGE_COUNT_PENDING, PAGE_COUNT_VERIFIED, PAYMENT_PENDING, PAID, CREATOR_ASSIGNED, IN_PROGRESS, QUALITY_CHECK, READY_FOR_PICKUP, DELIVERED, CANCELLED, REFUND_PENDING, REFUNDED
+  subtotal          Float                    @default(0)
+  rushFee           Float                    @default(0)
+  additionalFee     Float                    @default(0)
+  discount          Float                    @default(0)
+  totalAmount       Float                    @default(0)
+  currency          String                   @default("INR")
+  deadline          DateTime
+  pickupLocationId  String?
+  instructions      String?
+  razorpayOrderId   String?                  @unique
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @default(now()) @updatedAt
+
+  user              User                     @relation("StudentOrders", fields: [userId], references: [id])
+  pickupLocation    CampusLocation?          @relation(fields: [pickupLocationId], references: [id])
+  assignmentDetail  AssignmentDetails?
+  cadOrderDetail    CadOrderDetails?
+  files             OrderFile[]
+  payments          Payment[]
+  assignments       CreatorOrderAssignment[]
+  reviews           Review[]
+}
+
+model AssignmentDetails {
+  id            String   @id @default(uuid())
+  orderId       String   @unique
+  billablePages Int?     // verified by admin
+  pricePerPage  Float    @default(25)
+  rushFee       Float    @default(0)
+  additionalFee Float    @default(0)
+  
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model CadOrderDetails {
+  id            String     @id @default(uuid())
+  orderId       String     @unique
+  cadProductId  String
+  quantity      Int        @default(1)
+  pricePerSheet Float
+  rushFee       Float      @default(0)
+  additionalFee Float      @default(0)
+
+  order         Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cadProduct    CadProduct @relation(fields: [cadProductId], references: [id])
+}
+
+model OrderFile {
+  id          String   @id @default(uuid())
+  orderId     String
+  fileUrl     String
+  fileName    String
+  fileType    String   // assignment_doc, question_ref, work_proof
+  isProof     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id                String   @id @default(uuid())
+  orderId           String
+  razorpayOrderId   String?  @unique
+  razorpayPaymentId String?  @unique
+  razorpaySignature String?
+  amount            Float
+  currency          String   @default("INR")
+  method            String?  @default("upi") // upi, card, netbanking, demo
+  provider          String   @default("RAZORPAY") // DEMO, RAZORPAY
+  status            String   @default("CREATED") // CREATED, AUTHORIZED, CAPTURED, FAILED, REFUNDED
+  refundId          String?
+  refundAmount      Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model CreatorProfile {
+  id           String                   @id @default(uuid())
+  userId       String                   @unique
+  availability Boolean                  @default(true)
+  rating       Float                    @default(4.9)
+  totalOrders  Int                      @default(0)
+  totalEarnings Float                   @default(0)
+
+  user         User                     @relation(fields: [userId], references: [id])
+  assignments  CreatorOrderAssignment[]
+}
+
+model CreatorOrderAssignment {
+  id           String         @id @default(uuid())
+  orderId      String
+  creatorId    String
+  payoutAmount Float
+  status       String         @default("ASSIGNED") // ASSIGNED, ACCEPTED, IN_PROGRESS, PROOF_SUBMITTED, COMPLETED
+  assignedAt   DateTime       @default(now())
+  completedAt  DateTime?
+
+  order        Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  creator      CreatorProfile @relation(fields: [creatorId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  orderId   String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
