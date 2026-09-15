@@ -89,6 +89,14 @@ export async function POST(request: Request) {
       },
     });
 
+    // Automatically record order in Assignment Orders Spreadsheet
+    try {
+      const { recordAssignmentOrderInSpreadsheet } = await import("@/lib/spreadsheet");
+      await recordAssignmentOrderInSpreadsheet(newOrder.id);
+    } catch (e) {
+      console.error("Spreadsheet recording error:", e);
+    }
+
     return NextResponse.json({
       success: true,
       order: newOrder,

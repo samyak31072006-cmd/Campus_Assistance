@@ -174,6 +174,18 @@ export async function POST(request: Request) {
       },
     });
 
+    // Update spreadsheet row with updated status (PAID/CREATOR_ASSIGNED)
+    try {
+      const { recordAssignmentOrderInSpreadsheet, recordCadOrderInSpreadsheet } = await import("@/lib/spreadsheet");
+      if (order.serviceType === "ASSIGNMENT") {
+        await recordAssignmentOrderInSpreadsheet(order.id);
+      } else {
+        await recordCadOrderInSpreadsheet(order.id);
+      }
+    } catch (e) {
+      console.error("Spreadsheet status update error:", e);
+    }
+
     return NextResponse.json({
       success: true,
       orderNumber: order.orderNumber,

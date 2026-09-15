@@ -190,7 +190,7 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setActiveTab("orders")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
@@ -207,6 +207,24 @@ export default function AdminDashboardPage() {
           >
             CAD Catalogue & Samples
           </button>
+          <a
+            href="/api/export/assignments"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center gap-1.5 shadow-xs"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Export Assignment Spreadsheet</span>
+          </a>
+          <a
+            href="/api/export/cad"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-xs"
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span>Export CAD Spreadsheet</span>
+          </a>
         </div>
       </div>
 

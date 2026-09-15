@@ -97,6 +97,14 @@ export async function POST(request: Request) {
       },
     });
 
+    // Automatically record order in CAD Orders Spreadsheet
+    try {
+      const { recordCadOrderInSpreadsheet } = await import("@/lib/spreadsheet");
+      await recordCadOrderInSpreadsheet(newOrder.id);
+    } catch (e) {
+      console.error("Spreadsheet recording error:", e);
+    }
+
     return NextResponse.json({
       success: true,
       order: newOrder,
