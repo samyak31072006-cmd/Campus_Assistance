@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 // Ensure exports folder exists
 const exportsDir = path.join(process.cwd(), "public", "exports");
 if (!fs.existsSync(exportsDir)) {
-  fs.mkdirSync(exportsDir, { recursive: recursive: true } as any);
+  fs.mkdirSync(exportsDir, { recursive: true });
 }
 
 const assignmentCsvPath = path.join(exportsDir, "assignment_orders.csv");
