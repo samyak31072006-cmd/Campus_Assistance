@@ -2,11 +2,11 @@ import fs from "fs";
 import path from "path";
 import { db } from "@/lib/db";
 
-// Ensure exports folder exists
-const exportsDir = path.join(process.cwd(), "public", "exports");
-if (!fs.existsSync(exportsDir)) {
-  fs.mkdirSync(exportsDir, { recursive: true });
-}
+// Use /tmp for serverless environments (Vercel) or public/exports locally
+const isServerless = process.env.VERCEL || process.env.NODE_ENV === "production";
+const exportsDir = isServerless
+  ? path.join("/tmp", "exports")
+  : path.join(process.cwd(), "public", "exports");
 
 const assignmentCsvPath = path.join(exportsDir, "assignment_orders.csv");
 const cadCsvPath = path.join(exportsDir, "cad_orders.csv");
@@ -52,6 +52,16 @@ function escapeCsvField(field: any): string {
   return `"${str}"`;
 }
 
+function ensureExportDir() {
+  try {
+    if (!fs.existsSync(exportsDir)) {
+      fs.mkdirSync(exportsDir, { recursive: true });
+    }
+  } catch (e) {
+    console.warn("Could not create export dir on read-only filesystem:", e);
+  }
+}
+
 /**
  * Sync order to external Google Sheets Webhook if configured in .env
  */
@@ -74,7 +84,7 @@ export async function syncToGoogleSheets(orderData: Record<string, any>, service
 }
 
 /**
- * Append single assignment order row to public/exports/assignment_orders.csv
+ * Append single assignment order row to spreadsheet
  */
 export async function recordAssignmentOrderInSpreadsheet(orderId: string) {
   try {
@@ -106,14 +116,19 @@ export async function recordAssignmentOrderInSpreadsheet(orderId: string) {
       new Date(order.createdAt).toLocaleString("en-IN"),
     ];
 
-    const fileExists = fs.existsSync(assignmentCsvPath);
-    const csvRow = rowData.map(escapeCsvField).join(",") + "\n";
+    try {
+      ensureExportDir();
+      const fileExists = fs.existsSync(assignmentCsvPath);
+      const csvRow = rowData.map(escapeCsvField).join(",") + "\n";
 
-    if (!fileExists) {
-      const headerLine = ASSIGNMENT_HEADERS.map(escapeCsvField).join(",") + "\n";
-      fs.writeFileSync(assignmentCsvPath, headerLine + csvRow, "utf8");
-    } else {
-      fs.appendFileSync(assignmentCsvPath, csvRow, "utf8");
+      if (!fileExists) {
+        const headerLine = ASSIGNMENT_HEADERS.map(escapeCsvField).join(",") + "\n";
+        fs.writeFileSync(assignmentCsvPath, headerLine + csvRow, "utf8");
+      } else {
+        fs.appendFileSync(assignmentCsvPath, csvRow, "utf8");
+      }
+    } catch (fsErr) {
+      console.warn("Skipping local CSV file write (serverless environment):", fsErr);
     }
 
     // Attempt Google Sheets webhook sync
@@ -139,7 +154,7 @@ export async function recordAssignmentOrderInSpreadsheet(orderId: string) {
 }
 
 /**
- * Append single CAD order row to public/exports/cad_orders.csv
+ * Append single CAD order row to spreadsheet
  */
 export async function recordCadOrderInSpreadsheet(orderId: string) {
   try {
@@ -172,14 +187,19 @@ export async function recordCadOrderInSpreadsheet(orderId: string) {
       new Date(order.createdAt).toLocaleString("en-IN"),
     ];
 
-    const fileExists = fs.existsSync(cadCsvPath);
-    const csvRow = rowData.map(escapeCsvField).join(",") + "\n";
+    try {
+      ensureExportDir();
+      const fileExists = fs.existsSync(cadCsvPath);
+      const csvRow = rowData.map(escapeCsvField).join(",") + "\n";
 
-    if (!fileExists) {
-      const headerLine = CAD_HEADERS.map(escapeCsvField).join(",") + "\n";
-      fs.writeFileSync(cadCsvPath, headerLine + csvRow, "utf8");
-    } else {
-      fs.appendFileSync(cadCsvPath, csvRow, "utf8");
+      if (!fileExists) {
+        const headerLine = CAD_HEADERS.map(escapeCsvField).join(",") + "\n";
+        fs.writeFileSync(cadCsvPath, headerLine + csvRow, "utf8");
+      } else {
+        fs.appendFileSync(cadCsvPath, csvRow, "utf8");
+      }
+    } catch (fsErr) {
+      console.warn("Skipping local CSV file write (serverless environment):", fsErr);
     }
 
     // Attempt Google Sheets webhook sync

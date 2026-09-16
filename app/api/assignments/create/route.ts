@@ -37,13 +37,27 @@ export async function POST(request: Request) {
       });
     }
 
-    // Safe Campus Location lookup
-    const defaultLoc = await db.campusLocation.findFirst({ where: { active: true } });
-    let locationId = defaultLoc?.id;
-
+    // Safe Campus Location lookup or creation fallback
+    let locationId: string | null = null;
     if (pickupLocationId && !pickupLocationId.startsWith("loc-")) {
       const validLoc = await db.campusLocation.findUnique({ where: { id: pickupLocationId } });
       if (validLoc) locationId = validLoc.id;
+    }
+    if (!locationId) {
+      const defaultLoc = await db.campusLocation.findFirst({ where: { active: true } });
+      if (defaultLoc) {
+        locationId = defaultLoc.id;
+      } else {
+        const newLoc = await db.campusLocation.create({
+          data: {
+            name: "Central Library (Ground Floor Desk)",
+            description: "Main Campus Library Pickup Counter",
+            hours: "9:00 AM - 8:00 PM",
+            active: true,
+          },
+        });
+        locationId = newLoc.id;
+      }
     }
 
     // Create Order with PAGE_COUNT_PENDING status
@@ -94,7 +108,7 @@ export async function POST(request: Request) {
       const { recordAssignmentOrderInSpreadsheet } = await import("@/lib/spreadsheet");
       await recordAssignmentOrderInSpreadsheet(newOrder.id);
     } catch (e) {
-      console.error("Spreadsheet recording error:", e);
+      console.warn("Spreadsheet recording notice:", e);
     }
 
     return NextResponse.json({
@@ -104,7 +118,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error creating assignment order:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to create assignment order" },
+      { success: false, error: "Failed to create assignment order: " + (error instanceof Error ? error.message : String(error)) },
       { status: 500 }
     );
   }
